@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Yay</title>
+    <style>
+        html, body { margin: 0; padding: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/102/three.min.js"></script>
+<script src="orbitcontrols.js"></script>
+<script>
+
+function sphericalToCartesian(vertices, i, r, theta, phi, si = -1) {
+    let rs = r * Math.sin(phi);
+    if (si !== -1) {
+        vertices[i] = vertices[si] = rs * Math.cos(theta),
+            vertices[i + 1] = vertices[si + 1] = rs * Math.sin(theta),
+            vertices[i+2] = vertices[si + 2] = r * Math.cos(phi);
+    } else {
+        vertices[i] = rs * Math.cos(theta), vertices[i + 1] = rs * Math.sin(theta), vertices[i+2] = r * Math.cos(phi);
+    }
+
+}
+
+let scene = new THREE.Scene();
+let aspect = window.innerWidth / window.innerHeight;
+let camera = new THREE.PerspectiveCamera( 75, aspect, 0.1, 1000 );
+let renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.body.appendChild( renderer.domElement );
+
+let geometry = new THREE.BufferGeometry();
+// create a simple square shape. We duplicate the top left and bottom right
+// vertices because each vertex needs to appear once per triangle.
+
+let minTheta = 0;
+let maxTheta = 2 * Math.PI;
+let minPhi = 0;
+let maxPhi = 2 * Math.PI;
+let thetaStepCount = 100;
+let phiStepCount = 500;
+
+function r(theta,phi) {
+    return Math.cos(theta) + Math.sin(phi);
+}
+
+let i  = 0;
+
+let vertices = new Float32Array(18 * thetaStepCount * phiStepCount);
+
+let thetaStepSize = (maxTheta - minTheta) / thetaStepCount;
+let phiStepSize = (maxPhi - minPhi) / phiStepCount;
+
+function copyInto(arr, i, values) {
+    for (let j = 0; j < values.length; j++) {
+        arr[i + j] = values[j];
+    }
+}
+
+function recalc() {
+    let i = 0;
+    for (let th = 0; th < thetaStepCount; th++) {
+        let theta = th / thetaStepCount * (maxTheta - minTheta) + minTheta;
+        for (let ph = 0; ph < phiStepCount; ph++) {
+            let phi = ph / phiStepCount * (maxPhi - minPhi) + minPhi;
+
+            sphericalToCartesian(vertices, i, r(theta, phi), theta, phi, i + 12);
+
+            sphericalToCartesian(vertices, i + 3, r(theta + thetaStepSize, phi + phiStepSize), theta + thetaStepSize, phi + phiStepSize, i + 9);
+
+            sphericalToCartesian(vertices, i + 6, r(theta, phi + phiStepSize), theta, phi + phiStepSize);
+
+            sphericalToCartesian(vertices, i + 15, r(theta + thetaStepSize, phi), theta + thetaStepSize, phi);
+
+            i += 18;
+        }
+    }
+
+    geometry.addAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
+
+    geometry.computeVertexNormals();
+}
+
+recalc();
+
+// itemSize = 3 because there are 3 values (components) per vertex
+
+
+
+let material = new THREE.MeshPhongMaterial( { ambient: 0x050505, color: 0xaaaaee, specular: 0x555555, shininess: 30, side: THREE.DoubleSide } );
+let mesh = new THREE.Mesh( geometry, material );
+let lights = [new THREE.DirectionalLight( 0x888888 ), new THREE.DirectionalLight( 0x888888 ), new THREE.DirectionalLight( 0x888888 )];
+
+lights[0].position.set( 10, 10, 10 )
+lights[1].position.set( -10, -10, -10 )
+lights[2].position.set( 10, -10, 10 )
+lights[2].position.set( -10, 10, -10 )
+lights.forEach(light => scene.add(light));
+
+lights.forEach(light => {light.castShadow = true; light.shadow.bias = -0.001; });
+renderer.shadowMapEnabled = true;
+
+mesh.castShadow = true;
+mesh.receiveShadow = true;
+
+
+window.addEventListener( 'resize', function () {
+
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize( window.innerWidth, window.innerHeight );
+
+}, false);
+
+
+let ambient = new THREE.AmbientLight( 0x704040 );
+scene.add(ambient);
+
+scene.add(mesh);
+camera.position.z = 5;
+
+let render = function () {
+    requestAnimationFrame( render );
+    i += 0.01;
+    recalc();
+
+    controls.update();
+
+    renderer.render( scene, camera );
+};
+
+let controls = new THREE.OrbitControls( camera );
+
+controls.update();
+
+render();
+
+</script>
+</body>
+</html>
